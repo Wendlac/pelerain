@@ -134,25 +134,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               children: [
                 // ── Brand header ──
                 Center(
-                  child: Container(
-                    width: 64,
+                  child: Image.asset(
+                    'assets/images/pelerain_logo.png',
+                    width: 160,
                     height: 64,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFF5A0FA8), Color(0xFF9B4FFF)],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(
-                      Icons.directions_bus_rounded,
-                      color: Colors.white,
-                      size: 32,
-                    ),
+                    fit: BoxFit.contain,
                   ),
                 ),
-                const Gap(24),
+                const Gap(28),
 
                 Text(
                   _isLogin ? 'Bon retour !' : 'Créer un compte',

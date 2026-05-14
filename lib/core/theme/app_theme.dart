@@ -43,13 +43,15 @@ class AppTheme {
         ),
         iconTheme: const IconThemeData(color: AppColors.content),
       ),
+      // All app buttons are pill-shaped (fully rounded) for visual consistency
+      // with the auth screen and modal CTAs.
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           minimumSize: const Size(double.infinity, 56),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
           ),
           elevation: 0,
           textStyle: GoogleFonts.dmSans(
@@ -65,12 +67,39 @@ class AppTheme {
           side: const BorderSide(color: AppColors.primary, width: 1.5),
           minimumSize: const Size(double.infinity, 56),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
           ),
           textStyle: GoogleFonts.dmSans(
             fontSize: 16,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.3,
+          ),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(double.infinity, 56),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
+          ),
+          textStyle: GoogleFonts.dmSans(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
+          ),
+          textStyle: GoogleFonts.dmSans(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),

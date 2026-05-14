@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required to reach the Supabase backend (and any future remote API). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="pelerain"
         android:name="${applicationName}"

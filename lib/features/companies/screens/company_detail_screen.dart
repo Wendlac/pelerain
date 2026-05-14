@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -10,8 +11,9 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/services/haptic_service.dart';
 import '../../../shared/models/agency.dart';
 import '../../../shared/models/company.dart';
+import '../../../shared/providers/search_provider.dart';
 
-class CompanyDetailScreen extends StatelessWidget {
+class CompanyDetailScreen extends ConsumerWidget {
   final Company company;
   const CompanyDetailScreen({super.key, required this.company});
 
@@ -33,11 +35,24 @@ class CompanyDetailScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final agenciesByCity = company.agenciesByCity;
+  Widget build(BuildContext context, WidgetRef ref) {
+    // The `company` passed via go_router comes from a trip's join, which
+    // doesn't include the agencies (separate table). Look it up in the
+    // cached companies list — that one has agencies populated.
+    final cached = ref.watch(companiesProvider).valueOrNull;
+    final hydrated = cached
+            ?.firstWhere(
+              (c) => c.id == company.id,
+              orElse: () => company,
+            ) ??
+        company;
+    final displayCompany = hydrated;
 
-    // Center of all agency pins for initial map position
-    final allAgencies = company.agencies;
+    final agenciesByCity = displayCompany.agenciesByCity;
+    final allAgencies = displayCompany.agencies;
+    final isLoadingAgencies =
+        allAgencies.isEmpty && ref.watch(companiesProvider).isLoading;
+
     final mapCenter = allAgencies.isNotEmpty
         ? LatLng(
             allAgencies.map((a) => a.latitude).reduce((a, b) => a + b) /
@@ -67,7 +82,7 @@ class CompanyDetailScreen extends StatelessWidget {
             title: Row(
               children: [
                 _CompanyLogo(
-                  name: company.name,
+                  name: displayCompany.name,
                   color: _logoColor,
                   textColor: _logoTextColor,
                   size: 32,
@@ -75,7 +90,7 @@ class CompanyDetailScreen extends StatelessWidget {
                 ),
                 const Gap(10),
                 Text(
-                  company.name,
+                  displayCompany.name,
                   style: GoogleFonts.dmSans(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -100,9 +115,9 @@ class CompanyDetailScreen extends StatelessWidget {
                       // Stars
                       Row(
                         children: List.generate(5, (i) => Icon(
-                          i < company.rating.floor()
+                          i < displayCompany.rating.floor()
                               ? Icons.star_rounded
-                              : (i < company.rating
+                              : (i < displayCompany.rating
                                   ? Icons.star_half_rounded
                                   : Icons.star_border_rounded),
                           size: 16,
@@ -111,7 +126,7 @@ class CompanyDetailScreen extends StatelessWidget {
                       ),
                       const Gap(6),
                       Text(
-                        company.rating.toStringAsFixed(1),
+                        displayCompany.rating.toStringAsFixed(1),
                         style: GoogleFonts.dmSans(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -120,7 +135,7 @@ class CompanyDetailScreen extends StatelessWidget {
                       ),
                       const Gap(4),
                       Text(
-                        '· ${company.totalTrips} trajets effectués',
+                        '· ${displayCompany.totalTrips} trajets effectués',
                         style: GoogleFonts.dmSans(
                           fontSize: 13,
                           color: AppColors.contentTertiary,
@@ -134,7 +149,7 @@ class CompanyDetailScreen extends StatelessWidget {
                 const Gap(20),
 
                 // ── Description ──
-                if (company.description != null) ...[
+                if (displayCompany.description != null) ...[
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
@@ -143,7 +158,7 @@ class CompanyDetailScreen extends StatelessWidget {
                         Text('Description', style: AppTextStyles.headingXS),
                         const Gap(10),
                         Text(
-                          company.description!,
+                          displayCompany.description!,
                           style: GoogleFonts.dmSans(
                             fontSize: 14,
                             color: AppColors.contentSecondary,
@@ -157,19 +172,35 @@ class CompanyDetailScreen extends StatelessWidget {
                 ],
 
                 // ── Agencies grouped by city ──
-                if (agenciesByCity.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text('Agences', style: AppTextStyles.headingXS),
+                ),
+                const Gap(12),
+
+                if (isLoadingAgencies)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (agenciesByCity.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Text('Agences', style: AppTextStyles.headingXS),
-                  ),
-                  const Gap(12),
+                    child: Text(
+                      'Aucune agence référencée pour cette compagnie.',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 13,
+                        color: AppColors.contentTertiary,
+                      ),
+                    ),
+                  )
+                else
                   ...agenciesByCity.entries.map((entry) => _CityAgencyGroup(
-                    city: entry.key,
-                    agencies: entry.value,
-                    logoColor: _logoColor,
-                  )),
-                  const Gap(28),
-                ],
+                        city: entry.key,
+                        agencies: entry.value,
+                        logoColor: _logoColor,
+                      )),
+                const Gap(28),
 
                 // ── Map ──
                 if (allAgencies.isNotEmpty) ...[

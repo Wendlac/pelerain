@@ -110,7 +110,7 @@ class _PrimaryButton extends StatelessWidget {
                 colors: [Color(0xFF8B3FEF), Color(0xFF5A0FA8)],
               ),
         color: disabled ? AppColors.contentDisabled : null,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
         boxShadow: disabled
             ? null
             : [
@@ -144,7 +144,7 @@ class _SecondaryButton extends StatelessWidget {
       height: 56,
       decoration: BoxDecoration(
         color: AppColors.primarySurface,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 1.5),
         boxShadow: [
           BoxShadow(
@@ -186,7 +186,7 @@ class _DangerButton extends StatelessWidget {
       height: 56,
       decoration: BoxDecoration(
         color: AppColors.error.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
         border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
       ),
       child: _ButtonContent(widget: widget, color: AppColors.error),

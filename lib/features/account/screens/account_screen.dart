@@ -253,7 +253,7 @@ class AccountScreen extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(
                       color: AppColors.error.withValues(alpha: 0.07),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(100),
                       border: Border.all(
                         color: AppColors.error.withValues(alpha: 0.2),
                       ),
