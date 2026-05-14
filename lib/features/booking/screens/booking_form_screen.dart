@@ -47,23 +47,39 @@ class _BookingFormScreenState extends ConsumerState<BookingFormScreen> {
     HapticService.booking();
     setState(() => _loading = true);
 
-    await Future.delayed(const Duration(milliseconds: 1200));
-
-    final passengers = _forms.map((f) => Passenger(
-      firstName: f.firstName,
-      lastName: f.lastName,
-      type: f.type,
-    )).toList();
+    final passengers = _forms
+        .map((f) => Passenger(
+              firstName: f.firstName,
+              lastName: f.lastName,
+              type: f.type,
+            ))
+        .toList();
 
     ref.read(bookingPassengersProvider.notifier).state = passengers;
-    ref.read(reservationsProvider.notifier).createReservation(
-      trip: widget.trip,
-      passengers: passengers,
-    );
 
-    if (mounted) {
+    try {
+      await ref.read(reservationsProvider.notifier).createReservation(
+            trip: widget.trip,
+            passengers: passengers,
+          );
+      if (!mounted) return;
       setState(() => _loading = false);
       context.go('/booking-success');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      HapticService.error();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Impossible de créer la réservation. Réessayez.',
+            style: GoogleFonts.dmSans(fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
     }
   }
 
@@ -184,7 +200,8 @@ class _BookingFormScreenState extends ConsumerState<BookingFormScreen> {
 
                   const Gap(8),
 
-                  // Info box
+                  // Info box — explicitly mentions the payment window so the
+                  // user knows the deadline before they confirm.
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -198,14 +215,17 @@ class _BookingFormScreenState extends ConsumerState<BookingFormScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Icon(
-                          Icons.warning_amber_rounded,
+                          Icons.timer_rounded,
                           color: AppColors.warningDark,
                           size: 18,
                         ),
                         const Gap(10),
                         Expanded(
                           child: Text(
-                            'Présentez-vous en agence au moins 30 minutes avant le départ avec votre code de réservation.',
+                            'Après confirmation, vous aurez '
+                            '${widget.trip.company.paymentWindowHours}h '
+                            'pour payer en agence avec votre code de réservation. '
+                            'Passé ce délai, votre place sera libérée.',
                             style: AppTextStyles.textSMedium.copyWith(
                               color: AppColors.content,
                             ),

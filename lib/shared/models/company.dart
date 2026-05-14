@@ -10,6 +10,10 @@ class Company {
   final String? description;
   final List<Agency> agencies;
 
+  /// Hours the customer has to pay at the agency before the reservation
+  /// expires. Set per company; defaults to 5h.
+  final int paymentWindowHours;
+
   const Company({
     required this.id,
     required this.name,
@@ -19,7 +23,40 @@ class Company {
     this.totalTrips = 0,
     this.description,
     this.agencies = const [],
+    this.paymentWindowHours = 5,
   });
+
+  /// Build a Company from a Supabase row. Pass [agencies] separately if the
+  /// query already joined them; otherwise the list starts empty and can be
+  /// hydrated via `copyWith` after fetching from the agencies table.
+  factory Company.fromJson(
+    Map<String, dynamic> json, {
+    List<Agency> agencies = const [],
+  }) =>
+      Company(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        phone: (json['phone'] as String?) ?? '',
+        logoUrl: json['logo_url'] as String?,
+        rating: ((json['rating'] as num?) ?? 4.0).toDouble(),
+        totalTrips: (json['total_trips'] as num?)?.toInt() ?? 0,
+        description: json['description'] as String?,
+        agencies: agencies,
+        paymentWindowHours:
+            (json['payment_window_hours'] as num?)?.toInt() ?? 5,
+      );
+
+  Company copyWith({List<Agency>? agencies}) => Company(
+        id: id,
+        name: name,
+        phone: phone,
+        logoUrl: logoUrl,
+        rating: rating,
+        totalTrips: totalTrips,
+        description: description,
+        agencies: agencies ?? this.agencies,
+        paymentWindowHours: paymentWindowHours,
+      );
 
   /// Returns agencies grouped by city: { 'Ouagadougou': [...], 'Bobo-Dioulasso': [...] }
   Map<String, List<Agency>> get agenciesByCity {

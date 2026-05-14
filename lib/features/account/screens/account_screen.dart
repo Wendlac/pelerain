@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:gap/gap.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/haptic_service.dart';
 import '../../../shared/providers/booking_provider.dart';
+import '../../../shared/providers/supabase_provider.dart';
 import '../../../core/utils/formatters.dart';
 
 class AccountScreen extends ConsumerWidget {
@@ -11,8 +14,19 @@ class AccountScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final reservations = ref.watch(reservationsProvider);
+    // Reservations is now async — only the data state contributes to totals.
+    final reservationsAsync = ref.watch(reservationsProvider);
+    final reservations = reservationsAsync.valueOrNull ?? const [];
     final totalSpent = reservations.fold<double>(0, (s, r) => s + r.totalPrice);
+
+    // Profile info from the current Supabase session
+    final session = ref.watch(currentSessionProvider);
+    final fullName = (session?.user.userMetadata?['full_name'] as String?)?.trim();
+    final email = session?.user.email ?? '';
+    final displayName = (fullName == null || fullName.isEmpty)
+        ? (email.isNotEmpty ? email.split('@').first : 'Voyageur Pelerain')
+        : fullName;
+    final initials = _initialsFor(displayName);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -65,7 +79,7 @@ class AccountScreen extends ConsumerWidget {
                           ),
                           child: Center(
                             child: Text(
-                              'VP',
+                              initials,
                               style: GoogleFonts.dmSans(
                                 fontSize: 26,
                                 fontWeight: FontWeight.w800,
@@ -98,9 +112,9 @@ class AccountScreen extends ConsumerWidget {
 
                     const Gap(20),
 
-                    // Large ALL-CAPS name
+                    // Large ALL-CAPS name (split into 2 lines if it has a space)
                     Text(
-                      'VOYAGEUR\nPELERAIN',
+                      displayName.toUpperCase().replaceFirst(' ', '\n'),
                       textAlign: TextAlign.center,
                       style: GoogleFonts.dmSans(
                         fontSize: 40,
@@ -113,9 +127,9 @@ class AccountScreen extends ConsumerWidget {
 
                     const Gap(8),
 
-                    // Subtitle
+                    // Email subtitle
                     Text(
-                      'Compte personnel',
+                      email.isNotEmpty ? email : 'Compte personnel',
                       style: GoogleFonts.dmSans(
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
@@ -227,8 +241,145 @@ class AccountScreen extends ConsumerWidget {
               ),
             ),
 
+            // ── Logout ──
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 32, 20, 0),
+                child: GestureDetector(
+                  onTap: () => _confirmLogout(context, ref),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppColors.error.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.logout_rounded,
+                          size: 18,
+                          color: AppColors.error,
+                        ),
+                        const Gap(8),
+                        Text(
+                          'Se déconnecter',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.error,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
             // Bottom padding for floating nav
             const SliverToBoxAdapter(child: SizedBox(height: 110)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Returns up to 2 capital letters from the user's name.
+  /// "Awa Ouédraogo" → "AO", "awa" → "AW", empty → "VP".
+  static String _initialsFor(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return 'VP';
+    final parts = trimmed.split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return trimmed.substring(0, trimmed.length >= 2 ? 2 : 1).toUpperCase();
+  }
+
+  void _confirmLogout(BuildContext context, WidgetRef ref) {
+    HapticService.selection();
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.logout_rounded, color: AppColors.error, size: 24),
+            ),
+            const Gap(16),
+            Text(
+              'Se déconnecter ?',
+              style: GoogleFonts.dmSans(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: AppColors.content,
+              ),
+            ),
+            const Gap(8),
+            Text(
+              'Vous devrez vous reconnecter pour accéder à vos réservations.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.dmSans(
+                fontSize: 14,
+                color: AppColors.contentTertiary,
+              ),
+            ),
+            const Gap(24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      HapticService.light();
+                      Navigator.of(ctx, rootNavigator: true).pop();
+                    },
+                    child: const Text('Annuler'),
+                  ),
+                ),
+                const Gap(12),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.error,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                    ),
+                    onPressed: () async {
+                      HapticService.error();
+                      Navigator.of(ctx, rootNavigator: true).pop();
+                      await ref.read(supabaseClientProvider).auth.signOut();
+                      // The router redirect handles navigation to /auth.
+                      if (context.mounted) context.go('/auth');
+                    },
+                    child: const Text('Déconnexion', style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),

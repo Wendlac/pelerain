@@ -352,7 +352,9 @@ class TripDetailsScreen extends ConsumerWidget {
                             const Gap(8),
                             Expanded(
                               child: Text(
-                                'Paiement en agence uniquement. Présentez votre code de réservation.',
+                                'Paiement en agence uniquement, dans les '
+                                '${trip.company.paymentWindowHours}h '
+                                'suivant la réservation.',
                                 style: AppTextStyles.textSMedium
                                     .copyWith(color: AppColors.content),
                               ),

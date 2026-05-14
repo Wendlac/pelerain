@@ -6,7 +6,6 @@ import '../constants/app_colors.dart';
 import '../constants/app_text_styles.dart';
 import '../services/haptic_service.dart';
 import '../../shared/providers/search_provider.dart';
-import '../../shared/repositories/mock_data.dart';
 
 /// Opens the filter bottom sheet.
 /// Returns true if filters were applied.
@@ -136,18 +135,37 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
           // ── Section: Compagnies ──
           _SectionTitle(label: 'Compagnie'),
           const Gap(12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: MockData.companies.map((company) {
-              final selected = _selectedCompanies.contains(company.id);
-              return _FilterChip(
-                label: company.name,
-                selected: selected,
-                onTap: () => _toggleCompany(company.id),
-              );
-            }).toList(),
-          ),
+          // Companies come from Supabase; render an empty placeholder while
+          // the list is loading or unavailable so the filter UI stays usable.
+          ref.watch(companiesProvider).when(
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+                error: (_, __) => Text(
+                  'Compagnies indisponibles',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 13,
+                    color: AppColors.contentTertiary,
+                  ),
+                ),
+                data: (companies) => Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: companies.map((company) {
+                    final selected = _selectedCompanies.contains(company.id);
+                    return _FilterChip(
+                      label: company.name,
+                      selected: selected,
+                      onTap: () => _toggleCompany(company.id),
+                    );
+                  }).toList(),
+                ),
+              ),
 
           const Gap(24),
 

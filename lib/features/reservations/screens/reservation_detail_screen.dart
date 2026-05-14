@@ -7,6 +7,7 @@ import 'package:gap/gap.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/services/haptic_service.dart';
+import '../../../core/widgets/payment_countdown.dart';
 import '../../../shared/models/reservation.dart';
 import '../../../shared/providers/booking_provider.dart';
 import '../../../core/utils/formatters.dart';
@@ -15,8 +16,18 @@ class ReservationDetailScreen extends ConsumerWidget {
   final Reservation reservation;
   const ReservationDetailScreen({super.key, required this.reservation});
 
+  /// Lapsed payment windows surface as "expired" in the UI even if the DB
+  /// hasn't been updated yet.
+  ReservationStatus get _effectiveStatus {
+    if (reservation.status == ReservationStatus.pending &&
+        DateTime.now().isAfter(reservation.expiresAt)) {
+      return ReservationStatus.expired;
+    }
+    return reservation.status;
+  }
+
   Color get _statusColor {
-    switch (reservation.status) {
+    switch (_effectiveStatus) {
       case ReservationStatus.pending:   return AppColors.warning;
       case ReservationStatus.confirmed: return AppColors.success;
       case ReservationStatus.cancelled: return AppColors.error;
@@ -25,7 +36,7 @@ class ReservationDetailScreen extends ConsumerWidget {
   }
 
   String get _statusLabel {
-    switch (reservation.status) {
+    switch (_effectiveStatus) {
       case ReservationStatus.pending:   return 'En attente';
       case ReservationStatus.confirmed: return 'Confirmé';
       case ReservationStatus.cancelled: return 'Annulé';
@@ -33,12 +44,11 @@ class ReservationDetailScreen extends ConsumerWidget {
     }
   }
 
-  bool get _isCancellable =>
-      reservation.status == ReservationStatus.pending;
+  bool get _isCancellable => _effectiveStatus == ReservationStatus.pending;
 
   bool get _isCancelled =>
-      reservation.status == ReservationStatus.cancelled ||
-      reservation.status == ReservationStatus.expired;
+      _effectiveStatus == ReservationStatus.cancelled ||
+      _effectiveStatus == ReservationStatus.expired;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -99,6 +109,12 @@ class ReservationDetailScreen extends ConsumerWidget {
                     statusLabel: _statusLabel,
                     isCancelled: _isCancelled,
                   ),
+
+                  // ── Payment countdown (only while pending) ──
+                  if (reservation.status == ReservationStatus.pending) ...[
+                    const Gap(16),
+                    PaymentCountdown.banner(expiresAt: reservation.expiresAt),
+                  ],
 
                   const Gap(20),
 

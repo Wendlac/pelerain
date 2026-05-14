@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../features/onboarding/screens/splash_screen.dart';
 import '../features/onboarding/screens/onboarding_screen.dart';
+import '../features/auth/screens/auth_screen.dart';
 import '../features/search/screens/home_screen.dart';
 import '../features/search/screens/search_results_screen.dart';
 import '../features/booking/screens/trip_details_screen.dart';
@@ -14,6 +18,7 @@ import '../features/companies/screens/company_detail_screen.dart';
 import '../shared/models/trip.dart';
 import '../shared/models/reservation.dart';
 import '../shared/models/company.dart';
+import '../shared/providers/supabase_provider.dart';
 import '../core/constants/app_colors.dart';
 import '../core/services/haptic_service.dart';
 
@@ -103,12 +108,39 @@ CustomTransitionPage<T> _slideUpPage<T>({
 
 // ─── Router ──────────────────────────────────────────────────────────────────
 
-class AppRouter {
-  static final _rootKey = GlobalKey<NavigatorState>();
+/// Routes that don't require an authenticated user.
+/// Anything else triggers a redirect to /auth when there's no session.
+const _publicRoutes = {'/splash', '/onboarding', '/auth'};
 
-  static final router = GoRouter(
-    navigatorKey: _rootKey,
+final _rootNavigatorKey = GlobalKey<NavigatorState>();
+
+/// Riverpod-aware GoRouter. The `refreshListenable` is wired to the Supabase
+/// auth stream, so a sign-in / sign-out automatically re-evaluates redirects.
+final goRouterProvider = Provider<GoRouter>((ref) {
+  final authNotifier = _AuthRefreshNotifier(
+    ref.watch(supabaseClientProvider).auth.onAuthStateChange,
+  );
+  ref.onDispose(authNotifier.dispose);
+
+  return GoRouter(
+    navigatorKey: _rootNavigatorKey,
     initialLocation: '/splash',
+    refreshListenable: authNotifier,
+    redirect: (context, state) {
+      final session = ref.read(supabaseClientProvider).auth.currentSession;
+      final loggedIn = session != null;
+      final location = state.matchedLocation;
+
+      // 1. Logged out + trying to access a protected page → send to /auth
+      if (!loggedIn && !_publicRoutes.contains(location)) {
+        return '/auth';
+      }
+      // 2. Already logged in but on the auth screen → go home
+      if (loggedIn && location == '/auth') {
+        return '/home';
+      }
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/splash',
@@ -120,6 +152,12 @@ class AppRouter {
         path: '/onboarding',
         pageBuilder: (context, state) => _fadePage(
           context: context, state: state, child: const OnboardingScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/auth',
+        pageBuilder: (context, state) => _fadePage(
+          context: context, state: state, child: const AuthScreen(),
         ),
       ),
       ShellRoute(
@@ -203,31 +241,47 @@ class AppRouter {
       ),
     ],
   );
+});
+
+/// Bridges Supabase's auth stream into a Listenable that GoRouter can subscribe
+/// to via `refreshListenable`. Whenever the auth state changes (sign-in,
+/// sign-out, token refresh), the router re-evaluates its redirect logic.
+class _AuthRefreshNotifier extends ChangeNotifier {
+  _AuthRefreshNotifier(Stream<AuthState> stream) {
+    _sub = stream.listen((_) => notifyListeners());
+  }
+
+  late final StreamSubscription<AuthState> _sub;
+
+  @override
+  void dispose() {
+    _sub.cancel();
+    super.dispose();
+  }
 }
 
 // ─── Main shell with bottom nav ──────────────────────────────────────────────
 
-class MainShell extends StatefulWidget {
+class MainShell extends StatelessWidget {
   final Widget child;
   const MainShell({super.key, required this.child});
 
   @override
-  State<MainShell> createState() => _MainShellState();
-}
-
-class _MainShellState extends State<MainShell> {
-  int _currentIndex = 0;
-
-  @override
   Widget build(BuildContext context) {
+    // Determine the active tab from the current route, not from local state —
+    // that way the bottom nav stays in sync after deep links or back-nav.
+    final location = GoRouterState.of(context).matchedLocation;
+    int currentIndex = 0;
+    if (location.startsWith('/reservations')) currentIndex = 1;
+    if (location.startsWith('/account')) currentIndex = 2;
+
     return Scaffold(
       extendBody: true, // content flows under the floating nav
-      body: widget.child,
+      body: child,
       bottomNavigationBar: _FloatingPillNav(
-        currentIndex: _currentIndex,
+        currentIndex: currentIndex,
         onTap: (index) {
           HapticService.selection();
-          setState(() => _currentIndex = index);
           switch (index) {
             case 0: context.go('/home');
             case 1: context.go('/reservations');

@@ -1,26 +1,50 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/search_params.dart';
 import '../models/trip.dart';
-import '../repositories/mock_data.dart';
+import '../models/company.dart';
+import 'supabase_provider.dart';
 
 final searchParamsProvider = StateProvider<SearchParams?>((ref) => null);
 
-final searchResultsProvider = StateNotifierProvider<SearchResultsNotifier, AsyncValue<List<Trip>>>(
-  (ref) => SearchResultsNotifier(),
+/// Fetches all companies once, kept in cache for the session. Used by the
+/// filter sheet so the user can pick companies by name.
+final companiesProvider = FutureProvider<List<Company>>((ref) async {
+  final repo = ref.watch(supabaseRepositoryProvider);
+  return repo.fetchCompanies();
+});
+
+/// Provides a single company by id (resolved from the cached list).
+final companyByIdProvider = Provider.family<Company?, String>((ref, id) {
+  final companies = ref.watch(companiesProvider).valueOrNull;
+  if (companies == null) return null;
+  for (final c in companies) {
+    if (c.id == id) return c;
+  }
+  return null;
+});
+
+/// Search results state, exposed as AsyncValue so screens can render
+/// loading/error/data uniformly.
+final searchResultsProvider =
+    StateNotifierProvider<SearchResultsNotifier, AsyncValue<List<Trip>>>(
+  (ref) => SearchResultsNotifier(ref),
 );
 
 class SearchResultsNotifier extends StateNotifier<AsyncValue<List<Trip>>> {
-  SearchResultsNotifier() : super(const AsyncValue.data([]));
+  SearchResultsNotifier(this._ref) : super(const AsyncValue.data([]));
+
+  final Ref _ref;
 
   Future<void> search(SearchParams params) async {
     state = const AsyncValue.loading();
-    await Future.delayed(const Duration(milliseconds: 800)); // simulate API
-    final results = MockData.getTrips(
-      departureCity: params.departureCity,
-      arrivalCity: params.arrivalCity,
-      date: params.date,
-    );
-    state = AsyncValue.data(results);
+    state = await AsyncValue.guard(() {
+      final repo = _ref.read(supabaseRepositoryProvider);
+      return repo.searchTrips(
+        departureCity: params.departureCity,
+        arrivalCity: params.arrivalCity,
+        date: params.date,
+      );
+    });
   }
 
   void clear() => state = const AsyncValue.data([]);

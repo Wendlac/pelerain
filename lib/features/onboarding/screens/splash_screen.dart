@@ -48,7 +48,9 @@ class _SplashScreenState extends State<SplashScreen>
     _ctrl.forward();
 
     Future.delayed(const Duration(milliseconds: 2600), () {
-      if (mounted) context.go('/onboarding');
+      // Always try to go home — the router redirects unauthenticated users
+      // to /auth automatically.
+      if (mounted) context.go('/home');
     });
   }
 

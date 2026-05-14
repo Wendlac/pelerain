@@ -6,6 +6,7 @@ import 'package:gap/gap.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/services/haptic_service.dart';
+import '../../../core/widgets/payment_countdown.dart';
 import '../../../core/widgets/skeu_card.dart';
 import '../../../shared/models/reservation.dart';
 import '../../../shared/providers/booking_provider.dart';
@@ -16,23 +17,44 @@ class MyReservationsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final reservations = ref.watch(reservationsProvider);
+    final reservationsAsync = ref.watch(reservationsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: reservations.isEmpty
-            ? Column(
+        child: reservationsAsync.when(
+          loading: () => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              _PageHeader(title: 'Mes billets', count: null),
+              Expanded(child: Center(child: CircularProgressIndicator())),
+            ],
+          ),
+          error: (err, _) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _PageHeader(title: 'Mes billets', count: null),
+              Expanded(
+                child: _ErrorState(
+                  message: 'Impossible de charger vos billets.',
+                  onRetry: () => ref.read(reservationsProvider.notifier).refresh(),
+                ),
+              ),
+            ],
+          ),
+          data: (reservations) {
+            if (reservations.isEmpty) {
+              return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _PageHeader(
-                    title: 'Mes billets',
-                    count: null,
-                  ),
-                  const Expanded(child: _EmptyReservations()),
+                children: const [
+                  _PageHeader(title: 'Mes billets', count: null),
+                  Expanded(child: _EmptyReservations()),
                 ],
-              )
-            : CustomScrollView(
+              );
+            }
+            return RefreshIndicator(
+              onRefresh: () => ref.read(reservationsProvider.notifier).refresh(),
+              child: CustomScrollView(
                 slivers: [
                   SliverToBoxAdapter(
                     child: _PageHeader(
@@ -46,14 +68,18 @@ class MyReservationsScreen extends ConsumerWidget {
                       itemCount: reservations.length,
                       separatorBuilder: (_, __) => const Gap(12),
                       itemBuilder: (ctx, i) {
-                        final r = reservations[reservations.length - 1 - i];
+                        // Reservations are already sorted desc by created_at
+                        final r = reservations[i];
                         return _ReservationCard(
                           reservation: r,
                           onTap: () {
                             HapticService.selection();
                             ctx.push('/reservation-detail', extra: r);
                           },
-                          onCancel: r.status == ReservationStatus.pending
+                          // Only allow cancel for still-active pending reservations
+                          // (not for ones whose payment window already lapsed).
+                          onCancel: (r.status == ReservationStatus.pending &&
+                                  !DateTime.now().isAfter(r.expiresAt))
                               ? () => _confirmCancel(ctx, ref, r.id)
                               : null,
                         );
@@ -62,6 +88,9 @@ class MyReservationsScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -214,8 +243,19 @@ class _ReservationCard extends StatelessWidget {
 
   const _ReservationCard({required this.reservation, this.onTap, this.onCancel});
 
+  /// Pending reservations whose payment window has elapsed are visually
+  /// treated as expired, even though the DB hasn't been flipped yet (that
+  /// would require a server-side job).
+  ReservationStatus get _effectiveStatus {
+    if (reservation.status == ReservationStatus.pending &&
+        DateTime.now().isAfter(reservation.expiresAt)) {
+      return ReservationStatus.expired;
+    }
+    return reservation.status;
+  }
+
   Color get _statusColor {
-    switch (reservation.status) {
+    switch (_effectiveStatus) {
       case ReservationStatus.pending: return AppColors.warning;
       case ReservationStatus.confirmed: return AppColors.success;
       case ReservationStatus.cancelled: return AppColors.error;
@@ -224,13 +264,13 @@ class _ReservationCard extends StatelessWidget {
   }
 
   Color get _statusTextColor {
-    return reservation.status == ReservationStatus.pending
+    return _effectiveStatus == ReservationStatus.pending
         ? AppColors.content
         : Colors.white;
   }
 
   String get _statusLabel {
-    switch (reservation.status) {
+    switch (_effectiveStatus) {
       case ReservationStatus.pending: return 'En attente';
       case ReservationStatus.confirmed: return 'Confirmé';
       case ReservationStatus.cancelled: return 'Annulé';
@@ -240,8 +280,8 @@ class _ReservationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isCancelled = reservation.status == ReservationStatus.cancelled ||
-        reservation.status == ReservationStatus.expired;
+    final isCancelled = _effectiveStatus == ReservationStatus.cancelled ||
+        _effectiveStatus == ReservationStatus.expired;
 
     return Opacity(
       opacity: isCancelled ? 0.6 : 1.0,
@@ -382,6 +422,27 @@ class _ReservationCard extends StatelessWidget {
                   const Divider(color: AppColors.divider, height: 1),
                   const Gap(14),
 
+                  // Payment countdown — only when the reservation is pending
+                  if (reservation.status == ReservationStatus.pending) ...[
+                    Row(
+                      children: [
+                        Text(
+                          'À payer en agence:',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 12,
+                            color: AppColors.contentTertiary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const Spacer(),
+                        PaymentCountdown.compact(
+                          expiresAt: reservation.expiresAt,
+                        ),
+                      ],
+                    ),
+                    const Gap(12),
+                  ],
+
                   // Details row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -511,6 +572,51 @@ class _EmptyReservations extends StatelessWidget {
                 color: AppColors.contentTertiary,
               ),
               textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ErrorState({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.cloud_off_rounded,
+                color: AppColors.error,
+                size: 36,
+              ),
+            ),
+            const Gap(16),
+            Text(
+              message,
+              style: AppTextStyles.headingXS,
+              textAlign: TextAlign.center,
+            ),
+            const Gap(16),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Réessayer'),
             ),
           ],
         ),
