@@ -47,7 +47,9 @@ export async function loginAction(
     }
   }
 
-  redirect('/reservations')
+  // Pelerain super-admin lands in the admin console (no company to manage).
+  // Regular agents land in their company's reservations.
+  redirect(profile.role === 'admin' ? '/admin/companies' : '/reservations')
 }
 
 export async function logoutAction() {

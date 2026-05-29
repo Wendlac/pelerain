@@ -131,6 +131,44 @@ export async function requireAgent(): Promise<AgentProfile> {
 }
 
 /**
+ * Gatekeeper for Pelerain super-admin routes (/admin/*). Verifies the user
+ * is logged in AND has role='admin'. Anyone else is redirected to /login
+ * after a forced sign-out so the access denial is unambiguous.
+ */
+export async function requireSuperAdmin(): Promise<AgentProfile> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, email, full_name, role, company_id')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile || profile.role !== 'admin') {
+    // Don't sign them out — they may be a regular agent who just clicked the
+    // wrong link. Send them back to /reservations where they belong.
+    redirect('/reservations')
+  }
+
+  return {
+    id: profile.id,
+    email: profile.email,
+    full_name: profile.full_name,
+    role: profile.role,
+    company_id: profile.company_id,
+    company_name: null,
+    subscription_status: null,
+    trial_ends_at: null,
+    current_period_ends_at: null,
+  }
+}
+
+/**
  * Looser version of requireAgent: only checks login + role, not subscription.
  * Used by /billing pages so a locked agent can still log in, read the
  * lockout message, and sign out — without ending up in a redirect loop.
