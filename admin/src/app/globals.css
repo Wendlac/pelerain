@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+/* ── Pelerain brand tokens (matched to the Flutter app) ──────────────────── */
+@theme inline {
+  --color-background: #f8f8f8;
+  --color-foreground: #131515;
+
+  --color-primary: #761cea;
+  --color-primary-light: #9b5cf6;
+  --color-primary-dark: #5b0fb0;
+  --color-primary-surface: #f4ebff;
+
+  --color-secondary: #2bd9fe;
+  --color-secondary-dark: #00aacc;
+  --color-secondary-surface: #e6faff;
+
+  --color-success: #20bf55;
+  --color-success-dark: #16874a;
+  --color-warning: #ffe45e;
+  --color-warning-dark: #d4a800;
+  --color-error: #dd1155;
+  --color-error-dark: #a80d3e;
+
+  --color-surface: #ffffff;
+  --color-surface-elevated: #f3f3f3;
+  --color-surface-neutral: #f0f0f0;
+
+  --color-content: #131515;
+  --color-content-secondary: #4a4a4a;
+  --color-content-tertiary: #70746e;
+  --color-content-disabled: #b0b0b0;
+
+  --color-border: #e0e0e0;
+  --color-border-light: #eeeeee;
+  --color-divider: #eeeeee;
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-content);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
