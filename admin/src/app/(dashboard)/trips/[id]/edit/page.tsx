@@ -56,7 +56,10 @@ export default async function EditTripPage({
             departure_city: trip.departure_city,
             arrival_city: trip.arrival_city,
             departure_time: toLocalInput(trip.departure_time),
-            arrival_time: toLocalInput(trip.arrival_time),
+            duration_hours: durationBetween(
+              trip.departure_time,
+              trip.arrival_time
+            ),
             price: trip.price,
             available_seats: trip.available_seats,
             amenities: trip.amenities,
@@ -79,4 +82,16 @@ function toLocalInput(iso: string): string {
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
     `T${pad(d.getHours())}:${pad(d.getMinutes())}`
   )
+}
+
+/**
+ * Difference between two ISO timestamps, in hours. Rounded to 1 decimal
+ * (matches the form's `step={0.5}`) so a trip stored as 5h30m comes back
+ * as 5.5 instead of 5.499999.
+ */
+function durationBetween(startIso: string, endIso: string): number {
+  const start = new Date(startIso).getTime()
+  const end = new Date(endIso).getTime()
+  const hours = (end - start) / 3_600_000
+  return Math.round(hours * 10) / 10
 }

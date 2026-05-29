@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -16,7 +16,8 @@ type Defaults = {
   departure_city?: string
   arrival_city?: string
   departure_time?: string
-  arrival_time?: string
+  /** In hours; decimals allowed (e.g. 5.5 = 5h30m). */
+  duration_hours?: number | string
   price?: number | string
   available_seats?: number | string
   amenities?: string | null
@@ -44,6 +45,16 @@ export function TripForm({
     action,
     {}
   )
+
+  // Local controlled state for departure + duration so we can show a live
+  // preview of the computed arrival time. Both default to the supplied
+  // defaults (when editing) or empty (when creating).
+  const [departure, setDeparture] = useState(defaults?.departure_time ?? '')
+  const [duration, setDuration] = useState(
+    defaults?.duration_hours?.toString() ?? ''
+  )
+
+  const arrivalPreview = computeArrival(departure, duration)
 
   const fieldErr = (k: keyof NonNullable<TripFormState['fieldErrors']>) =>
     state?.fieldErrors?.[k]
@@ -97,21 +108,31 @@ export function TripForm({
         />
       </div>
 
-      {/* Times */}
+      {/* Departure + duration */}
       <div className="grid gap-5 sm:grid-cols-2">
         <Field
           label="Départ (date + heure)"
           name="departure_time"
           type="datetime-local"
-          defaultValue={defaults?.departure_time}
+          value={departure}
+          onChange={setDeparture}
           error={fieldErr('departure_time')}
         />
         <Field
-          label="Arrivée (date + heure)"
-          name="arrival_time"
-          type="datetime-local"
-          defaultValue={defaults?.arrival_time}
-          error={fieldErr('arrival_time')}
+          label="Durée du trajet (heures)"
+          name="duration_hours"
+          type="number"
+          min={0.5}
+          step={0.5}
+          value={duration}
+          onChange={setDuration}
+          placeholder="5"
+          error={fieldErr('duration_hours')}
+          helper={
+            arrivalPreview
+              ? `Arrivée prévue : ${arrivalPreview}`
+              : 'Décimales acceptées (ex. 5,5 = 5h30).'
+          }
         />
       </div>
 
@@ -174,6 +195,8 @@ function Field({
   name,
   type = 'text',
   defaultValue,
+  value,
+  onChange,
   placeholder,
   error,
   helper,
@@ -184,12 +207,17 @@ function Field({
   name: string
   type?: string
   defaultValue?: string
+  /** Controlled value. Pair with `onChange`. */
+  value?: string
+  /** Controlled change handler — receives the raw input value. */
+  onChange?: (v: string) => void
   placeholder?: string
   error?: string
   helper?: string
   min?: number
   step?: number
 }) {
+  const controlled = value !== undefined && onChange !== undefined
   return (
     <div className="space-y-1.5">
       <label htmlFor={name} className="text-sm font-semibold text-content">
@@ -199,7 +227,9 @@ function Field({
         id={name}
         name={name}
         type={type}
-        defaultValue={defaultValue}
+        {...(controlled
+          ? { value, onChange: (e) => onChange!(e.target.value) }
+          : { defaultValue })}
         placeholder={placeholder}
         min={min}
         step={step}
@@ -216,4 +246,26 @@ function Field({
       )}
     </div>
   )
+}
+
+/**
+ * Returns a French-formatted arrival timestamp when both inputs are valid,
+ * or null otherwise. Used to show a live preview under the duration field.
+ */
+function computeArrival(
+  departureLocal: string,
+  durationHours: string
+): string | null {
+  if (!departureLocal || !durationHours) return null
+  const d = new Date(departureLocal)
+  const h = Number(durationHours.replace(',', '.'))
+  if (isNaN(d.getTime()) || isNaN(h) || h <= 0) return null
+  const arrival = new Date(d.getTime() + h * 3_600_000)
+  return new Intl.DateTimeFormat('fr-FR', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(arrival)
 }

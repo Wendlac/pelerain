@@ -14,7 +14,7 @@ type TripField =
   | 'departure_city'
   | 'arrival_city'
   | 'departure_time'
-  | 'arrival_time'
+  | 'duration_hours'
   | 'price'
   | 'available_seats'
   | 'amenities'
@@ -32,6 +32,10 @@ type ParsedTrip = {
 /**
  * Parse + validate the form. Returns either { ok: true, trip } or
  * { ok: false, state } so callers can render field-level errors.
+ *
+ * The arrival time is computed from `departure_time + duration_hours`,
+ * because that's how transport agents think about trips ("Ouaga-Bobo,
+ * 5 heures de route") — and it removes one form input.
  */
 function parseTripForm(
   formData: FormData
@@ -41,7 +45,7 @@ function parseTripForm(
   const departure_city = String(formData.get('departure_city') ?? '').trim()
   const arrival_city = String(formData.get('arrival_city') ?? '').trim()
   const departure_time_raw = String(formData.get('departure_time') ?? '').trim()
-  const arrival_time_raw = String(formData.get('arrival_time') ?? '').trim()
+  const duration_raw = String(formData.get('duration_hours') ?? '').trim()
   const price_raw = String(formData.get('price') ?? '').trim()
   const seats_raw = String(formData.get('available_seats') ?? '').trim()
   const amenities_raw = String(formData.get('amenities') ?? '').trim()
@@ -53,25 +57,17 @@ function parseTripForm(
   }
 
   if (!departure_time_raw) errors.departure_time = 'Date+heure de départ requise.'
-  if (!arrival_time_raw) errors.arrival_time = 'Date+heure d’arrivée requise.'
 
   const departure_time = departure_time_raw ? new Date(departure_time_raw) : null
-  const arrival_time = arrival_time_raw ? new Date(arrival_time_raw) : null
-
   if (departure_time && isNaN(departure_time.getTime())) {
     errors.departure_time = 'Date invalide.'
   }
-  if (arrival_time && isNaN(arrival_time.getTime())) {
-    errors.arrival_time = 'Date invalide.'
-  }
-  if (
-    departure_time &&
-    arrival_time &&
-    !errors.departure_time &&
-    !errors.arrival_time &&
-    arrival_time <= departure_time
-  ) {
-    errors.arrival_time = "L'arrivée doit être après le départ."
+
+  const duration_hours = Number(duration_raw)
+  if (!duration_raw || isNaN(duration_hours) || duration_hours <= 0) {
+    errors.duration_hours = 'Durée invalide (en heures, > 0).'
+  } else if (duration_hours > 48) {
+    errors.duration_hours = 'Durée trop longue (max 48h).'
   }
 
   const price = Number(price_raw)
@@ -88,13 +84,19 @@ function parseTripForm(
     return { ok: false, state: { fieldErrors: errors } }
   }
 
+  // Compute arrival time = departure + duration. Decimals are allowed (e.g.
+  // 5.5 → 5h30m of travel) and converted to ms before adding.
+  const arrival_time = new Date(
+    departure_time!.getTime() + duration_hours * 3_600_000
+  )
+
   return {
     ok: true,
     trip: {
       departure_city,
       arrival_city,
       departure_time: departure_time!.toISOString(),
-      arrival_time: arrival_time!.toISOString(),
+      arrival_time: arrival_time.toISOString(),
       price,
       available_seats: seats,
       amenities: amenities_raw || null,
