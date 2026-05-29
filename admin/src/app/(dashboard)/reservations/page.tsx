@@ -43,12 +43,12 @@ function normaliseTrip(raw: Trip | Trip[] | null): Trip | null {
 export default async function ReservationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>
+  searchParams: Promise<{ q?: string; welcome?: string }>
 }) {
   // Already gated by the dashboard layout, but call it again to get the
   // company_name for the empty/error message and search context.
   const agent = await requireAgent()
-  const { q } = await searchParams
+  const { q, welcome } = await searchParams
   const search = q?.trim() ?? ''
 
   const supabase = await createClient()
@@ -102,6 +102,21 @@ export default async function ReservationsPage({
           />
         </form>
       </div>
+
+      {/* First-login welcome banner (after signup) */}
+      {welcome && (
+        <div className="rounded-3xl border border-primary/20 bg-primary-surface px-5 py-4 text-sm text-content">
+          <p className="font-bold text-primary">
+            Bienvenue sur Pelerain, {agent.full_name.split(' ')[0]} 🎉
+          </p>
+          <p className="mt-1 text-content-secondary">
+            Votre compagnie <strong>{agent.company_name}</strong> est créée et
+            votre essai gratuit de 14 jours a démarré. Commencez par ajouter
+            vos premiers trajets dans l'onglet <em>Trajets</em> — ils
+            deviendront immédiatement réservables côté voyageur.
+          </p>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-2xl border border-error/25 bg-error/8 p-4 text-sm font-medium text-error-dark">

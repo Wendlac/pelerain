@@ -41,7 +41,11 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const path = request.nextUrl.pathname
-  const isPublic = path === '/login' || path.startsWith('/_next')
+  // Public routes: anything reachable without a session
+  const isPublic =
+    path === '/login' ||
+    path === '/signup' ||
+    path.startsWith('/_next')
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone()
@@ -49,7 +53,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (user && path === '/login') {
+  // Don't auto-redirect away from /signup or /login if the user is logged in
+  // but doesn't have a company yet — the post-signup flow needs them on /signup
+  // for the brief moment between auth.signUp and the rpc call.
+  if (user && (path === '/login') ) {
     const url = request.nextUrl.clone()
     url.pathname = '/reservations'
     return NextResponse.redirect(url)
