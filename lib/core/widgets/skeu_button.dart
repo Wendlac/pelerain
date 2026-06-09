@@ -102,32 +102,21 @@ class _PrimaryButton extends StatelessWidget {
       width: widget.width ?? double.infinity,
       height: 56,
       decoration: BoxDecoration(
-        gradient: disabled
-            ? null
-            : const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF8B3FEF), Color(0xFF5A0FA8)],
-              ),
-        color: disabled ? AppColors.contentDisabled : null,
+        // Solid yellow per MVP spec — no gradient. The dark brown label
+        // gives enough contrast without a darker bottom edge.
+        color: disabled ? AppColors.contentDisabled : AppColors.primary,
         borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
         boxShadow: disabled
             ? null
             : [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.4),
-                  blurRadius: 16,
+                  color: AppColors.shadowDark.withValues(alpha: 0.35),
+                  blurRadius: 12,
                   offset: const Offset(0, 6),
-                ),
-                BoxShadow(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  blurRadius: 4,
-                  offset: const Offset(0, -1),
-                  spreadRadius: -2,
                 ),
               ],
       ),
-      child: _ButtonContent(widget: widget, color: Colors.white),
+      child: _ButtonContent(widget: widget, color: AppColors.content),
     );
   }
 }

@@ -4,613 +4,456 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:gap/gap.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_text_styles.dart';
 import '../../../core/services/haptic_service.dart';
-import '../../../core/widgets/skeu_card.dart';
-import '../../../core/widgets/filter_sheet.dart';
+import '../../../core/widgets/boarding_pass_card.dart';
+import '../../../core/widgets/pelerain_app_bar.dart';
 import '../../../shared/models/trip.dart';
 import '../../../shared/providers/search_provider.dart';
-import '../../../shared/providers/booking_provider.dart';
-import '../../../core/utils/formatters.dart';
 
+/// Search results — per MVP spec §3 Écran 2.
+///
+/// Header: small "Trajets" + section title "Voyages disponibles".
+/// Filter row: "Filtrer par" + 3 dropdown chips (Prix · Compagnie · Heure).
+/// Body: list of [BoardingPassCard]s.
+/// Footer: pill CTA "Rechercher un autre trajet" to go back home.
 class SearchResultsScreen extends ConsumerWidget {
   const SearchResultsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final params = ref.watch(searchParamsProvider);
     final resultsAsync = ref.watch(searchResultsProvider);
     final trips = ref.watch(filteredTripsProvider);
-    final sortOption = ref.watch(sortOptionProvider);
     final activeFilterCount = ref.watch(activeFilterCountProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
-          // App bar
-          SliverAppBar(
-            backgroundColor: AppColors.background,
-            pinned: true,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-              onPressed: () {
-                HapticService.light();
-                context.pop();
-              },
-            ),
-            title: params != null
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            params.departureCity,
-                            style: GoogleFonts.dmSans(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.content,
-                            ),
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 6),
-                            child: Icon(Icons.arrow_forward_rounded,
-                                size: 14, color: AppColors.primary),
-                          ),
-                          Text(
-                            params.arrivalCity,
-                            style: GoogleFonts.dmSans(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.content,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        '${Formatters.date(params.date)} · ${params.passengers} passager${params.passengers > 1 ? 's' : ''}',
-                        style: GoogleFonts.dmSans(
-                          fontSize: 12,
-                          color: AppColors.contentTertiary,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ],
-                  )
-                : const Text('Résultats'),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: _FilterButton(
-                  activeCount: activeFilterCount,
-                  onTap: () {
-                    HapticService.light();
-                    showFilterSheet(context);
-                  },
-                ),
-              ),
-            ],
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(56),
-              child: _SortBar(selected: sortOption),
-            ),
-          ),
-
-          // Content
-          resultsAsync.when(
-            loading: () => const SliverFillRemaining(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(color: AppColors.primary),
-                    Gap(16),
-                    Text('Recherche en cours...'),
-                  ],
-                ),
-              ),
-            ),
-            error: (e, _) => SliverFillRemaining(
-              child: Center(child: Text('Erreur: $e')),
-            ),
-            data: (_) {
-              if (trips.isEmpty) {
-                return const SliverFillRemaining(
-                  child: _EmptyState(),
-                );
-              }
-              return SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
-                sliver: SliverList.separated(
-                  itemCount: trips.length,
-                  separatorBuilder: (_, __) => const Gap(12),
-                  itemBuilder: (ctx, i) => TripCard(
-                    trip: trips[i],
-                    onTap: () {
-                      HapticService.selection();
-                      ref.read(selectedTripProvider.notifier).state = trips[i];
-                      ctx.push('/trip-details', extra: trips[i]);
-                    },
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SortBar extends ConsumerWidget {
-  final SortOption selected;
-  const _SortBar({required this.selected});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      color: AppColors.background,
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-      child: Row(
+      body: Column(
         children: [
-          Text(
-            'Trier par :',
-            style: GoogleFonts.dmSans(
-              fontSize: 13,
-              color: AppColors.contentTertiary,
-              fontWeight: FontWeight.w500,
-            ),
+          const PelerainAppBar(
+            appBarTitle: 'Trajets',
+            sectionTitle: 'Voyages disponibles',
           ),
-          const Gap(8),
-          ...[
-            (SortOption.price, 'Prix'),
-            (SortOption.time, 'Heure'),
-            (SortOption.duration, 'Durée'),
-          ].map((e) => Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: _SortChip(
-              label: e.$2,
-              selected: selected == e.$1,
-              onTap: () {
-                HapticService.selection();
-                ref.read(sortOptionProvider.notifier).state = e.$1;
-              },
-            ),
-          )),
-        ],
-      ),
-    );
-  }
-}
 
-class _SortChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _SortChip({required this.label, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : AppColors.surface,
-          borderRadius: BorderRadius.circular(100),
-          border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
-          ),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ]
-              : null,
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.dmSans(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : AppColors.contentSecondary,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class TripCard extends StatelessWidget {
-  final Trip trip;
-  final VoidCallback onTap;
-  const TripCard({super.key, required this.trip, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final isFull = trip.status == TripStatus.full;
-
-    return Opacity(
-      opacity: isFull ? 0.6 : 1,
-      child: SkeuCard(
-        onTap: isFull ? null : onTap,
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Header: company + price
-            Row(
+          // Filter row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Company badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppColors.primarySurface,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.borderLight),
-                  ),
-                  child: Text(
-                    trip.company.name,
-                    style: GoogleFonts.dmSans(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                // Price
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      Formatters.price(trip.price),
-                      style: GoogleFonts.dmSans(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.primary,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    Text(
-                      'par personne',
-                      style: GoogleFonts.dmSans(
-                        fontSize: 10,
-                        color: AppColors.contentTertiary,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-
-            const Gap(14),
-
-            // Time row
-            Row(
-              children: [
-                // Departure
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      Formatters.time(trip.departureTime),
-                      style: GoogleFonts.dmSans(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.content,
-                        letterSpacing: -1,
-                      ),
-                    ),
-                    Text(
-                      trip.departureCity,
-                      style: GoogleFonts.dmSans(
-                        fontSize: 12,
-                        color: AppColors.contentSecondary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-
-                // Duration line
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Column(
-                      children: [
-                        Text(
-                          trip.durationLabel,
-                          style: GoogleFonts.dmSans(
-                            fontSize: 11,
-                            color: AppColors.contentTertiary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const Gap(4),
-                        Row(
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(
-                                color: AppColors.primary,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            Expanded(
-                              child: Container(
-                                height: 1.5,
-                                color: AppColors.primary.withValues(alpha: 0.25),
-                              ),
-                            ),
-                            const Icon(
-                              Icons.directions_bus_rounded,
-                              size: 14,
-                              color: AppColors.primary,
-                            ),
-                            Expanded(
-                              child: Container(
-                                height: 1.5,
-                                color: AppColors.primary.withValues(alpha: 0.25),
-                              ),
-                            ),
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: AppColors.error,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Arrival
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      Formatters.time(trip.arrivalTime),
-                      style: GoogleFonts.dmSans(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.content,
-                        letterSpacing: -1,
-                      ),
-                    ),
-                    Text(
-                      trip.arrivalCity,
-                      style: GoogleFonts.dmSans(
-                        fontSize: 12,
-                        color: AppColors.contentSecondary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-
-            const Gap(12),
-            const Divider(color: AppColors.divider, height: 1),
-            const Gap(10),
-
-            // Footer: seats + amenities badge
-            Row(
-              children: [
-                if (isFull)
-                  _Badge(label: 'Complet', color: AppColors.error)
-                else if (trip.isAlmostFull)
-                  _Badge(
-                    label: '${trip.availableSeats} places restantes',
-                    color: AppColors.warning,
-                    textColor: AppColors.content,
-                  )
-                else
-                  _Badge(
-                    label: '${trip.availableSeats} places',
-                    color: AppColors.success.withValues(alpha: 0.1),
-                    textColor: AppColors.success,
-                  ),
-                const Gap(8),
-                if (trip.amenities != null)
-                  Expanded(
-                    child: Text(
-                      trip.amenities!,
-                      style: GoogleFonts.dmSans(
-                        fontSize: 11,
-                        color: AppColors.contentTertiary,
-                        fontWeight: FontWeight.w400,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                if (!isFull)
-                  const Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 12,
-                    color: AppColors.primary,
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Badge extends StatelessWidget {
-  final String label;
-  final Color color;
-  final Color? textColor;
-  const _Badge({required this.label, required this.color, this.textColor});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: color.a < 0.3 ? 1 : 0.12),
-        borderRadius: BorderRadius.circular(100),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.dmSans(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: textColor ?? color,
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyState extends ConsumerWidget {
-  const _EmptyState();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final hasFilters = ref.watch(activeFilterCountProvider) > 0;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.primarySurface,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                hasFilters ? Icons.filter_list_off_rounded : Icons.directions_bus_outlined,
-                color: AppColors.primary,
-                size: 36,
-              ),
-            ),
-            const Gap(20),
-            Text(
-              hasFilters ? 'Aucun résultat pour ces filtres' : 'Aucun trajet trouvé',
-              style: AppTextStyles.headingXS,
-              textAlign: TextAlign.center,
-            ),
-            const Gap(8),
-            Text(
-              hasFilters
-                  ? 'Modifiez ou supprimez vos filtres pour voir plus de trajets.'
-                  : 'Essayez une autre date ou un autre itinéraire.',
-              style: AppTextStyles.textMMedium.copyWith(color: AppColors.contentTertiary),
-              textAlign: TextAlign.center,
-            ),
-            if (hasFilters) ...[
-              const Gap(20),
-              GestureDetector(
-                onTap: () {
-                  ref.read(companyFilterProvider.notifier).state = {};
-                  ref.read(timeSlotFilterProvider.notifier).state = TimeSlot.any;
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.primarySurface,
-                    borderRadius: BorderRadius.circular(100),
-                    border: Border.all(color: AppColors.borderLight),
-                  ),
-                  child: Text(
-                    'Effacer les filtres',
-                    style: AppTextStyles.textSBold.copyWith(color: AppColors.primary),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FilterButton extends StatelessWidget {
-  final int activeCount;
-  final VoidCallback onTap;
-  const _FilterButton({required this.activeCount, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: activeCount > 0 ? AppColors.primarySurface : AppColors.surface,
-              borderRadius: BorderRadius.circular(100),
-              border: Border.all(
-                color: activeCount > 0 ? AppColors.primary : AppColors.border,
-                width: 1.5,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.tune_rounded,
-                  size: 16,
-                  color: activeCount > 0 ? AppColors.primary : AppColors.contentSecondary,
-                ),
-                const Gap(4),
                 Text(
-                  'Filtrer',
+                  'Filtrer par',
                   style: GoogleFonts.dmSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: activeCount > 0 ? AppColors.primary : AppColors.contentSecondary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.content,
                   ),
+                ),
+                const Gap(10),
+                Row(
+                  children: [
+                    _FilterChip(
+                      label: _priceFilterLabel(ref.watch(sortOptionProvider)),
+                      onTap: () => _openPriceMenu(context, ref),
+                    ),
+                    const Gap(8),
+                    _FilterChip(
+                      label: 'Compagnie',
+                      onTap: () => _openCompanyFilter(context, ref),
+                    ),
+                    const Gap(8),
+                    _FilterChip(
+                      label: _timeSlotLabel(ref.watch(timeSlotFilterProvider)),
+                      onTap: () => _openTimeMenu(context, ref),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          if (activeCount > 0)
-            Positioned(
-              top: -4,
-              right: -4,
-              child: Container(
-                width: 18,
-                height: 18,
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                ),
+
+          Expanded(
+            child: resultsAsync.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+              error: (e, _) => Padding(
+                padding: const EdgeInsets.all(24),
                 child: Center(
                   child: Text(
-                    '$activeCount',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
+                    'Une erreur est survenue lors de la recherche.\n$e',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.dmSans(
+                      color: AppColors.contentSecondary,
                     ),
                   ),
                 ),
               ),
+              data: (_) => _ResultsList(
+                trips: trips,
+                hasActiveFilters: activeFilterCount > 0,
+                onClearFilters: () {
+                  ref.read(companyFilterProvider.notifier).state = {};
+                  ref.read(timeSlotFilterProvider.notifier).state = TimeSlot.any;
+                  ref.read(sortOptionProvider.notifier).state = SortOption.price;
+                },
+              ),
             ),
+          ),
+
+          // ── Bottom CTA — return to home ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  HapticService.light();
+                  context.go('/home');
+                },
+                child: const Text('Rechercher un autre trajet'),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _priceFilterLabel(SortOption opt) {
+    switch (opt) {
+      case SortOption.price:    return 'Prix';
+      case SortOption.time:     return 'Heure';
+      case SortOption.duration: return 'Durée';
+    }
+  }
+
+  String _timeSlotLabel(TimeSlot s) {
+    if (s == TimeSlot.any) return 'Heure';
+    return s.shortLabel;
+  }
+
+  Future<void> _openPriceMenu(BuildContext context, WidgetRef ref) async {
+    HapticService.light();
+    final picked = await showModalBottomSheet<SortOption>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _SimpleMenuSheet<SortOption>(
+        title: 'Trier par',
+        options: const [
+          ('Prix croissant',     SortOption.price),
+          ('Heure de départ',    SortOption.time),
+          ('Durée du trajet',    SortOption.duration),
+        ],
+      ),
+    );
+    if (picked != null) {
+      ref.read(sortOptionProvider.notifier).state = picked;
+    }
+  }
+
+  Future<void> _openTimeMenu(BuildContext context, WidgetRef ref) async {
+    HapticService.light();
+    final picked = await showModalBottomSheet<TimeSlot>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _SimpleMenuSheet<TimeSlot>(
+        title: 'Heure de départ',
+        options: const [
+          ('Tous horaires', TimeSlot.any),
+          ('Matin (6h–12h)', TimeSlot.morning),
+          ('Après-midi (12h–18h)', TimeSlot.afternoon),
+          ('Soir (18h+)', TimeSlot.evening),
+        ],
+      ),
+    );
+    if (picked != null) {
+      ref.read(timeSlotFilterProvider.notifier).state = picked;
+    }
+  }
+
+  Future<void> _openCompanyFilter(BuildContext context, WidgetRef ref) async {
+    HapticService.light();
+    final companies = ref.read(companiesProvider).valueOrNull ?? [];
+    if (companies.isEmpty) return;
+
+    final current = ref.read(companyFilterProvider);
+    final picked = await showModalBottomSheet<Set<String>>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _CompanyFilterSheet(
+        companies:
+            companies.map((c) => (c.id, c.name)).toList(growable: false),
+        initialSelected: current,
+      ),
+    );
+    if (picked != null) {
+      ref.read(companyFilterProvider.notifier).state = picked;
+    }
+  }
+}
+
+// ─── Filter chip ───────────────────────────────────────────────────────────
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _FilterChip({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(color: AppColors.tagBorder, width: 1.5),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.dmSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.content,
+              ),
+            ),
+            const Gap(4),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 18,
+              color: AppColors.content,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Results list ──────────────────────────────────────────────────────────
+
+class _ResultsList extends StatelessWidget {
+  final List<Trip> trips;
+  final bool hasActiveFilters;
+  final VoidCallback onClearFilters;
+
+  const _ResultsList({
+    required this.trips,
+    required this.hasActiveFilters,
+    required this.onClearFilters,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (trips.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(32),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.search_off_rounded,
+                size: 56,
+                color: AppColors.contentTertiary,
+              ),
+              const Gap(16),
+              Text(
+                hasActiveFilters
+                    ? 'Aucun trajet ne correspond à vos filtres.'
+                    : 'Aucun trajet disponible pour ces critères.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.dmSans(
+                  fontSize: 15,
+                  color: AppColors.contentSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (hasActiveFilters) ...[
+                const Gap(16),
+                OutlinedButton(
+                  onPressed: onClearFilters,
+                  child: const Text('Effacer les filtres'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+      itemCount: trips.length,
+      separatorBuilder: (_, __) => const Gap(14),
+      itemBuilder: (ctx, i) => BoardingPassCard(
+        trip: trips[i],
+        compact: true,
+        onTap: () {
+          HapticService.selection();
+          ctx.push('/trip-details', extra: trips[i]);
+        },
+      ),
+    );
+  }
+}
+
+// ─── Bottom-sheet helpers ──────────────────────────────────────────────────
+
+/// Simple "pick one" sheet used by the Prix and Heure chips.
+class _SimpleMenuSheet<T> extends StatelessWidget {
+  final String title;
+  final List<(String, T)> options;
+  const _SimpleMenuSheet({required this.title, required this.options});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.all(Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.content,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded, color: AppColors.content),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+          const Gap(4),
+          ...options.map(
+            (o) => ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                o.$1,
+                style: GoogleFonts.dmSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.content,
+                ),
+              ),
+              onTap: () => Navigator.of(context).pop(o.$2),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompanyFilterSheet extends StatefulWidget {
+  final List<(String id, String name)> companies;
+  final Set<String> initialSelected;
+  const _CompanyFilterSheet({
+    required this.companies,
+    required this.initialSelected,
+  });
+
+  @override
+  State<_CompanyFilterSheet> createState() => _CompanyFilterSheetState();
+}
+
+class _CompanyFilterSheetState extends State<_CompanyFilterSheet> {
+  late Set<String> _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = {...widget.initialSelected};
+  }
+
+  void _toggle(String id) {
+    HapticService.selection();
+    setState(() {
+      if (_selected.contains(id)) {
+        _selected.remove(id);
+      } else {
+        _selected.add(id);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.all(Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Filtrer par compagnie',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.content,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded, color: AppColors.content),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+          const Gap(8),
+          ...widget.companies.map((c) {
+            final picked = _selected.contains(c.$1);
+            return CheckboxListTile(
+              value: picked,
+              onChanged: (_) => _toggle(c.$1),
+              activeColor: AppColors.primary,
+              checkColor: AppColors.content,
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: Text(
+                c.$2,
+                style: GoogleFonts.dmSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.content,
+                ),
+              ),
+            );
+          }),
+          const Gap(8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(_selected),
+              child: const Text('Appliquer'),
+            ),
+          ),
         ],
       ),
     );

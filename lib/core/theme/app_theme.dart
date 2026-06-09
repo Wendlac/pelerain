@@ -12,11 +12,12 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: const ColorScheme.light(
         primary: AppColors.primary,
-        onPrimary: Colors.white,
+        // Per MVP spec: dark brown text on the yellow primary, not white.
+        onPrimary: AppColors.content,
         primaryContainer: AppColors.primarySurface,
-        onPrimaryContainer: AppColors.primaryDark,
-        secondary: AppColors.primaryLight,
-        onSecondary: Colors.white,
+        onPrimaryContainer: AppColors.content,
+        secondary: AppColors.secondary,
+        onSecondary: AppColors.content,
         surface: AppColors.surface,
         onSurface: AppColors.content,
         error: AppColors.error,
@@ -25,7 +26,10 @@ class AppTheme {
         outlineVariant: AppColors.borderLight,
       ),
       scaffoldBackgroundColor: AppColors.background,
-      textTheme: GoogleFonts.dmSansTextTheme(),
+      textTheme: GoogleFonts.dmSansTextTheme().apply(
+        bodyColor: AppColors.content,
+        displayColor: AppColors.content,
+      ),
     );
 
     return base.copyWith(
@@ -45,10 +49,12 @@ class AppTheme {
       ),
       // All app buttons are pill-shaped (fully rounded) for visual consistency
       // with the auth screen and modal CTAs.
+      // All app buttons are pill-shaped (fully rounded) and use the dark-
+      // brown-on-yellow pairing from the MVP spec.
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
+          foregroundColor: AppColors.content,
           minimumSize: const Size(double.infinity, 56),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
@@ -63,8 +69,8 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primary,
-          side: const BorderSide(color: AppColors.primary, width: 1.5),
+          foregroundColor: AppColors.content,
+          side: const BorderSide(color: AppColors.tagBorder, width: 1.5),
           minimumSize: const Size(double.infinity, 56),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
@@ -79,7 +85,7 @@ class AppTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
+          foregroundColor: AppColors.content,
           minimumSize: const Size(double.infinity, 56),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
@@ -93,7 +99,7 @@ class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: AppColors.primary,
+          foregroundColor: AppColors.content,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
           ),
@@ -153,10 +159,15 @@ class AppTheme {
         type: BottomNavigationBarType.fixed,
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: AppColors.primarySurface,
+        backgroundColor: AppColors.background,
         selectedColor: AppColors.primary,
-        labelStyle: GoogleFonts.dmSans(fontSize: 13, fontWeight: FontWeight.w500),
-        side: BorderSide.none,
+        labelStyle: GoogleFonts.dmSans(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.content,
+        ),
+        // Soft yellow border on chips/tags as per spec §6.
+        side: const BorderSide(color: AppColors.tagBorder, width: 1.5),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
         ),

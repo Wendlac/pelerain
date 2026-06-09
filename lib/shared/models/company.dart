@@ -10,8 +10,9 @@ class Company {
   final String? description;
   final List<Agency> agencies;
 
-  /// Hours the customer has to pay at the agency before the reservation
-  /// expires. Set per company; defaults to 5h.
+  /// Window (in hours) communicated to the traveler for paying at the
+  /// agency before the seat is released. Used by the back-office only;
+  /// the mobile MVP doesn't surface it but we keep the column hydrated.
   final int paymentWindowHours;
 
   const Company({

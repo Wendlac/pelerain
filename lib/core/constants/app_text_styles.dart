@@ -23,6 +23,19 @@ class AppTextStyles {
   static TextStyle headingXS  = _dm(16, FontWeight.w700, 24, -0.3);
   static TextStyle heading2XS = _dm(14, FontWeight.w700, 20, -0.2);
 
+  /// Display headline used at the top of every search-related screen
+  /// (home, search results, trip detail, company detail).
+  /// Per design spec: Denk One, 40 px, letter-spacing −4 px, line-height 1.0.
+  /// Always rendered uppercase by callers so the condensed display font
+  /// keeps the same look across screens.
+  static TextStyle pageHeadline = GoogleFonts.denkOne(
+    fontSize: 40,
+    fontWeight: FontWeight.w400, // Denk One ships in a single regular weight
+    color: AppColors.content,
+    letterSpacing: -4,
+    height: 1.0,
+  );
+
   // Body text (16-20px: less aggressive letter-spacing)
   static TextStyle textXLMedium = _dm(20, FontWeight.w500, 28, 0);
   static TextStyle textXLBold   = _dm(20, FontWeight.w700, 28, 0);
